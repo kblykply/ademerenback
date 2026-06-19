@@ -1,0 +1,51 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model CatalogProduct {
+  slug      String   @id
+  sortOrder Int      @default(0) @map("sort_order")
+  product   Json
+  updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  @@index([sortOrder], map: "catalog_products_sort_order_idx")
+  @@map("catalog_products")
+}
+
+model SiteContent {
+  id        String   @id @default("main")
+  content   Json
+  updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  @@map("site_content")
+}
+
+model BlogPost {
+  slug        String   @id
+  status      String   @default("draft")
+  sortOrder   Int      @default(0) @map("sort_order")
+  publishedAt DateTime @default(now()) @map("published_at") @db.Timestamptz(6)
+  updatedAt   DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+  post        Json
+
+  @@index([status], map: "blog_posts_status_idx")
+  @@index([publishedAt], map: "blog_posts_published_at_idx")
+  @@index([sortOrder], map: "blog_posts_sort_order_idx")
+  @@map("blog_posts")
+}
+
+model Lead {
+  id        String   @id
+  status    String   @default("new")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+  lead      Json
+
+  @@index([createdAt], map: "leads_created_at_idx")
+  @@index([status], map: "leads_status_idx")
+  @@map("leads")
+}

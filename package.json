@@ -1,0 +1,26 @@
+{
+  "name": "ademerenback",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Standalone catalog backend for Adem Eren Decoration.",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "check": "node --check server.js",
+    "dev": "node server.js",
+    "prisma:generate": "prisma generate",
+    "prisma:pull": "prisma db pull",
+    "prisma:studio": "prisma studio",
+    "prisma:validate": "prisma validate",
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@prisma/client": "^7.8.0"
+  },
+  "devDependencies": {
+    "prisma": "^7.8.0"
+  }
+}
