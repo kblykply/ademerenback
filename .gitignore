@@ -16,6 +16,7 @@ yarn-error.log*
 # local catalog storage
 data/products.json
 data/site-content.json
+data/blog-posts.json
 data/leads.json
 
 # misc
