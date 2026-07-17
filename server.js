@@ -687,7 +687,6 @@ const seedBlogPosts = [
   },
 ];
 
-const categorySlugs = productCategories.map((category) => category.slug);
 const leadStatuses = ["new", "contacted", "closed"];
 const blogPostStatuses = ["draft", "published"];
 
@@ -705,6 +704,65 @@ const toLocalizedText = (value, fallback) => ({
   en: toText(value?.en, fallback.en),
   tr: toText(value?.tr, fallback.tr),
 });
+
+const toProductCategorySlug = (value, fallback) =>
+  slugify(toText(value)) || fallback;
+
+const toCategoryFallbackLabel = (slug) => {
+  const label = slug
+    .split("-")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toLocaleUpperCase("tr") + part.slice(1))
+    .join(" ");
+
+  return {
+    en: label || "New Category",
+    tr: label || "Yeni Kategori",
+  };
+};
+
+const getProductCategories = (products = seedProducts) => {
+  const categoryMap = new Map();
+
+  productCategories.forEach((category) => {
+    categoryMap.set(category.slug, category);
+  });
+
+  products.forEach((product) => {
+    const slug = toText(product.category);
+
+    if (!slug || categoryMap.has(slug)) {
+      return;
+    }
+
+    const fallbackLabel = toCategoryFallbackLabel(slug);
+    const label = {
+      en: product.categoryLabel?.en || product.collection?.en || fallbackLabel.en,
+      tr: product.categoryLabel?.tr || product.collection?.tr || fallbackLabel.tr,
+    };
+
+    categoryMap.set(slug, {
+      description: {
+        en:
+          product.description?.en ||
+          `${label.en} products for North Cyprus decoration projects.`,
+        tr:
+          product.description?.tr ||
+          `${label.tr} ürünleri Kuzey Kıbrıs dekorasyon projeleri için listelenir.`,
+      },
+      label,
+      shortLabel: label,
+      slug,
+      sourceUrl: product.sourceUrl || "",
+    });
+  });
+
+  return Array.from(categoryMap.values()).filter(
+    (category) =>
+      productCategories.some((item) => item.slug === category.slug) ||
+      products.some((product) => product.category === category.slug),
+  );
+};
 
 const toSpecValue = (value) => {
   if (Array.isArray(value)) {
@@ -743,12 +801,11 @@ const toTechnicalSpecs = (value, fallback) => {
 
 const normalizeProduct = (value, index, usedSlugs) => {
   const fallback = seedProducts[index] || seedProducts[0];
-  const category = categorySlugs.includes(value?.category)
-    ? value.category
-    : fallback.category;
+  const category = toProductCategorySlug(value?.category, fallback.category);
   const categoryInfo =
-    productCategories.find((item) => item.slug === category) ||
-    productCategories[0];
+    productCategories.find((item) => item.slug === category);
+  const categoryLabelFallback =
+    categoryInfo?.label || toCategoryFallbackLabel(category);
   const code = toText(value?.code, fallback.code || `AE-${index + 1}`);
   const name = toText(value?.name, fallback.name || code);
   const baseSlug =
@@ -781,8 +838,11 @@ const normalizeProduct = (value, index, usedSlugs) => {
     code,
     name,
     category,
-    categoryLabel: toLocalizedText(value?.categoryLabel, categoryInfo.label),
-    collection: toLocalizedText(value?.collection, fallback.collection),
+    categoryLabel: toLocalizedText(value?.categoryLabel, categoryLabelFallback),
+    collection: toLocalizedText(
+      value?.collection,
+      categoryInfo?.label || fallback.collection,
+    ),
     description: toLocalizedText(value?.description, fallback.description),
     image,
     applicationImage,
@@ -796,7 +856,7 @@ const normalizeProduct = (value, index, usedSlugs) => {
         : fallback.specs.tr,
     },
     technicalSpecs: toTechnicalSpecs(value?.technicalSpecs, fallback.technicalSpecs),
-    sourceUrl: toText(value?.sourceUrl, fallback.sourceUrl),
+    sourceUrl: toText(value?.sourceUrl, categoryInfo?.sourceUrl || fallback.sourceUrl),
     accent: toText(value?.accent, fallback.accent || "#20242f"),
   };
 };
@@ -1026,14 +1086,17 @@ const getBoundedNumberParam = (requestUrl, key, fallback, maxValue) => {
 };
 
 const filterProducts = (requestUrl, products) => {
-  const category = requestUrl.searchParams.get("category") || "";
+  const category = slugify(requestUrl.searchParams.get("category") || "");
   const query = requestUrl.searchParams.get("q") || "";
   const offset = getBoundedNumberParam(requestUrl, "offset", 0, 10000);
   const limit = getBoundedNumberParam(requestUrl, "limit", products.length, 100);
+  const activeCategory = products.some((product) => product.category === category)
+    ? category
+    : "";
   const queryTerms = normalizeSearch(query).split(/\s+/).filter(Boolean);
   const filteredProducts = products
     .filter((product) =>
-      categorySlugs.includes(category) ? product.category === category : true,
+      activeCategory ? product.category === activeCategory : true,
     )
     .filter((product) => {
       if (!queryTerms.length) {
@@ -1046,7 +1109,7 @@ const filterProducts = (requestUrl, products) => {
     });
 
   return {
-    category: categorySlugs.includes(category) ? category : "",
+    category: activeCategory,
     limit,
     offset,
     products: filteredProducts.slice(offset, offset + limit),
@@ -1837,7 +1900,8 @@ const handleRequest = async (request, response) => {
   }
 
   if (request.method === "GET" && pathname === "/api/categories") {
-    sendJson(request, response, 200, { categories: productCategories });
+    const products = await loadProducts();
+    sendJson(request, response, 200, { categories: getProductCategories(products) });
     return;
   }
 
@@ -1960,7 +2024,7 @@ const handleRequest = async (request, response) => {
     const result = filterProducts(requestUrl, products);
 
     sendJson(request, response, 200, {
-      categories: productCategories,
+      categories: getProductCategories(products),
       meta: {
         category: result.category,
         limit: result.limit,
