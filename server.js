@@ -1448,19 +1448,40 @@ const saveProductsToSupabase = async (products) => {
     sort_order: index,
     updated_at: now,
   }));
-
-  await deleteSupabaseRows(supabaseTables.products, "slug");
+  const existingRows = await requestSupabase(
+    `${supabaseTables.products}?select=slug`,
+  );
+  const existingSlugs = Array.isArray(existingRows)
+    ? existingRows.map((row) => row.slug).filter(Boolean)
+    : [];
+  const nextSlugs = new Set(rows.map((row) => row.slug));
 
   if (rows.length) {
-    await requestSupabase(supabaseTables.products, {
+    await requestSupabase(`${supabaseTables.products}?on_conflict=slug`, {
       body: JSON.stringify(rows),
       headers: {
         "Content-Type": "application/json",
-        Prefer: "return=minimal",
+        Prefer: "resolution=merge-duplicates,return=minimal",
       },
       method: "POST",
     });
   }
+
+  await Promise.all(
+    existingSlugs
+      .filter((slug) => !nextSlugs.has(slug))
+      .map((slug) =>
+        requestSupabase(
+          `${supabaseTables.products}?slug=eq.${encodeURIComponent(slug)}`,
+          {
+            headers: {
+              Prefer: "return=minimal",
+            },
+            method: "DELETE",
+          },
+        ),
+      ),
+  );
 
   return normalizedProducts;
 };
