@@ -1076,7 +1076,13 @@ const getProductSearchText = (product) =>
   );
 
 const getBoundedNumberParam = (requestUrl, key, fallback, maxValue) => {
-  const value = Number(requestUrl.searchParams.get(key));
+  const rawValue = requestUrl.searchParams.get(key);
+
+  if (rawValue === null || rawValue.trim() === "") {
+    return fallback;
+  }
+
+  const value = Number(rawValue);
 
   if (!Number.isFinite(value) || value < 0) {
     return fallback;
